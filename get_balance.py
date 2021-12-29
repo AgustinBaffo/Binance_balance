@@ -1,8 +1,17 @@
+import os
 import numpy as np
+import pickle
 import re
 
 from libraries.token import Token
 from libraries.global_functions import get_token_price_by_date
+
+
+REPORT_TRADING_PATH = './reports/trading.csv'
+REPORT_P2P_PATH = './reports/p2p.csv'
+P2P_DATA_PATH = './data/p2p.pickle'
+
+use_previous_data_p2p_data = True
 
 
 trading_fields = {
@@ -41,68 +50,89 @@ STABLECOINS_NAMES = [
 
 token_list = {}
 
-regexName = re.compile('[^a-zA-Z]') # Only letters
-regexValue = re.compile('[^\d\.]')  # Digits and point
+regexName = re.compile('[^a-zA-Z]')     # Only letters
+regexValue = re.compile('[^\d\.]')      # Digits and point
+regexRemoveComma = re.compile(r'(?!(([^"]*"){2})*[^"]*$),') # Commas between quotes marks
 
 
-# P2P File
-with open('./reports/p2p.csv') as f:
+# If data was already downloaded, do not run it again
+if use_previous_data_p2p_data == True and os.path.exists(P2P_DATA_PATH):
+    # Load p2p data from pickle
+    print("Load p2p datafrom "+str(P2P_DATA_PATH))
+    with open(P2P_DATA_PATH, 'rb') as handle:
+        token_list = pickle.load(handle)
+else:
+    # P2P File
+    with open(REPORT_P2P_PATH) as f:
+        next(f) # Ignore first line
+        for line in f:
+
+            line = line.rstrip("\n")    # remove end of line
+            values = line.split(",")
+
+            status = values[p2p_fields["status"]]
+
+            if status=="Completed":
+
+                token_name = values[p2p_fields["assetType"]]
+                token_qty = float(values[p2p_fields["quantity"]])
+                operated_time = values[p2p_fields["createdTime"]]
+                side = values[p2p_fields["orderType"]]
+                
+                if not(token_name in STABLECOINS_NAMES):
+                    token_price_usd = get_token_price_by_date(token_name,operated_time)
+
+                    # Add new elent to token list
+                    if not(token_name in token_list):
+                        token_list[token_name] = Token(token_name)
+
+                    token_list[token_name].trade(side,token_qty,token_price_usd)
+
+    # Save data into pickle
+    with open(P2P_DATA_PATH, 'wb') as handle:
+        pickle.dump(token_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
+
+# Trading file
+with open(REPORT_TRADING_PATH) as f:
     next(f) # Ignore first line
     for line in f:
 
-        line = line.rstrip("\n")    # remove end of line
+        line = line.rstrip("\n")                # remove end of line
+        line = regexRemoveComma.sub('', line)   # remove comma between quotes
+        line = line.replace('"', "")                   # remove quotes
+
         values = line.split(",")
+        status = values[trading_fields["status"]]
 
-        token_name = values[p2p_fields["assetType"]]
-        operated_time = values[p2p_fields["createdTime"]]
-        
-        if not(token_name in STABLECOINS_NAMES):
-            # token_price_usd = get_token_price_by_date(token_name,operated_time)
-            pass
-        else:
-            
-            pass
+        if status=="FILLED":
+            side = values[trading_fields["side"]]
+            price = float(values[trading_fields["avgPrice"]])
 
+            # Split tokens and values (ex 309.6300000000USDT -> 309.63 + USDT)
+            token1_str = values[trading_fields["executed"]]
+            token1_name = regexName.sub('', token1_str)
+            token1_qty = float(regexValue.sub('', token1_str))
 
-
-# # Trading file
-# with open('./reports/trading.csv') as f:
-#     next(f) # Ignore first line
-#     for line in f:
-
-#         line = line.rstrip("\n") #remove end of line
-#         values = line.split(",")
-
-#         status = values[trading_fields["status"]]
-#         if status=="FILLED":
-
-#             side = values[trading_fields["side"]]
-#             price = float(values[trading_fields["avgPrice"]])
-
-#             # Split tokens and values (ex 309.6300000000USDT -> 309.63 + USDT)
-#             token1_str = values[trading_fields["executed"]]
-#             token1_name = regexName.sub('', token1_str)
-#             token1_qty = float(regexValue.sub('', token1_str))
-
-#             token2_str = values[trading_fields["tradingTotal"]]
-#             token2_name = regexName.sub('', token2_str)
-#             token2_qty = float(regexValue.sub('', token2_str))
+            token2_str = values[trading_fields["tradingTotal"]]
+            token2_name = regexName.sub('', token2_str)
+            token2_qty = float(regexValue.sub('', token2_str))
 
 
-#             if not(token2_name in STABLECOINS_NAMES):
-#                 print(token2_name+" is not an stablecoin: only the balances for transactions with stablecoins are implemented")
-#                 quit()
-#             else:
-#                 # Add new elent to token list
-#                 if not(token1_name in token_list):
-#                     token_list[token1_name] = Token(token1_name)
+            if not(token2_name in STABLECOINS_NAMES):
+                print(token2_name+" is not an stablecoin: only the balances for transactions with stablecoins are implemented")
+                quit()
+            else:
 
-#                 token_list[token1_name].trade(side,token1_qty,price)
+                # Add new elent to token list
+                if not(token1_name in token_list):
+                    token_list[token1_name] = Token(token1_name)
+
+                token_list[token1_name].trade(side,token1_qty,price)
 
         
-# for t in token_list.values():
-#     # print("*-*-*-*")
-#     print(str(t.name)+": "+str(t.get_final_qty()))
-#     # print(t.purchases)
-#     # print(t.sales)
-#     print(" ")
+for t in token_list.values():
+    print("\n\n*-*-*-*-*")
+    print(str(t.name)+":")
+    t.compile()
+    print("Held token quantity: "+str(t.get_final_qty()))
+    print("Earns: "+str(t.get_balance()))

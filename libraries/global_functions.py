@@ -8,7 +8,7 @@ import yfinance as yf
 def next_day(str_date):
     '''
     Return next day
-    Input/output format: YYYY-DD-MM
+    Input/output format: YYYY-MM-DD
     '''
     t=time.strptime(str_date.replace("-",''),'%Y%m%d')
     return date(t.tm_year,t.tm_mon,t.tm_mday)+timedelta(1)
@@ -31,7 +31,7 @@ def get_token_price_by_date(token_name, operation_time):
 
     token_price_usd = np.array(df.iloc[operation_hr][["Open","Close"]]).mean() # Mean between open a close at that hour
 
-    return token_price_usd
+    return float(token_price_usd)
 
 
 
