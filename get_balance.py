@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pickle
 import re
+import hashlib
 
 from libraries.token import Token
 from libraries.global_functions import get_token_price_by_date
@@ -9,7 +10,8 @@ from libraries.global_functions import get_token_price_by_date
 
 REPORT_TRADING_PATH = './reports/trading.csv'
 REPORT_P2P_PATH = './reports/p2p.csv'
-P2P_DATA_PATH = './data/p2p.pickle'
+P2P_DATA_PATH = './data/p2p_report.pickle'
+P2P_HASH_PATH = './data/p2p_hash.pickle'
 
 use_previous_data_p2p_data = True
 
@@ -54,14 +56,43 @@ regexName = re.compile('[^a-zA-Z]')     # Only letters
 regexValue = re.compile('[^\d\.]')      # Digits and point
 regexRemoveComma = re.compile(r'(?!(([^"]*"){2})*[^"]*$),') # Commas between quotes marks
 
+def get_hash_file(file_path):
+    with open(file_path, 'rb') as f:  # opened in binary mode!
+        hash_value = hashlib.md5(f.read()).hexdigest()
+    return hash_value
 
-# If data was already downloaded, do not run it again
-if use_previous_data_p2p_data == True and os.path.exists(P2P_DATA_PATH):
-    # Load p2p data from pickle
-    print("Load p2p datafrom "+str(P2P_DATA_PATH))
-    with open(P2P_DATA_PATH, 'rb') as handle:
-        token_list = pickle.load(handle)
-else:
+
+####################################
+## Read p2p file.
+####################################
+
+# If file was already read, the data was already downloaded and storaged and the file wasn't change => use previous data
+need_read_p2p_file = True
+
+# Check if previous file information exist
+if use_previous_data_p2p_data and os.path.exists(P2P_DATA_PATH) and os.path.exists(P2P_HASH_PATH):
+
+    # Load previous hash from pickle and get hash from new file
+    with open(P2P_HASH_PATH, 'rb') as handle:
+        prev_hash_value = pickle.load(handle)
+    
+    new_hash_value = get_hash_file(REPORT_P2P_PATH)
+
+    if new_hash_value == prev_hash_value: # File didn't change
+        
+        print("P2P report didn't change: using previous data")
+
+        # Load p2p data from pickle
+        print("Load p2p datafrom "+str(P2P_DATA_PATH))
+        with open(P2P_DATA_PATH, 'rb') as handle:
+            token_list = pickle.load(handle)
+
+        need_read_p2p_file = False
+
+if need_read_p2p_file:
+
+    print("Reading P2P report")
+
     # P2P File
     with open(REPORT_P2P_PATH) as f:
         next(f) # Ignore first line
@@ -91,8 +122,17 @@ else:
     # Save data into pickle
     with open(P2P_DATA_PATH, 'wb') as handle:
         pickle.dump(token_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # Save hash into pickle
+    new_hash_value = get_hash_file(REPORT_P2P_PATH)
+    with open(P2P_HASH_PATH, 'wb') as handle:
+        pickle.dump(new_hash_value, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
-# Trading file
+
+####################################
+## Read trading file.
+####################################
+
+print("Reading trading report")
 with open(REPORT_TRADING_PATH) as f:
     next(f) # Ignore first line
     for line in f:
@@ -135,4 +175,4 @@ for t in token_list.values():
     print(str(t.name)+":")
     t.compile()
     print("Held token quantity: "+str(t.get_final_qty()))
-    print("Earns: "+str(t.get_balance()))
+    print("Earns: "+str(t.get_earns()))

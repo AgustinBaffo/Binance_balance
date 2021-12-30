@@ -71,14 +71,47 @@ class Token(object):
         '''
         return (self.purchases_sold[:,0]*self.purchases_sold[:,1]).sum()
     
-    def get_balance(self):
+    def get_earns(self):
+        '''
+        Returns 
+        '''
         if not(self.compiled):
-            print("Compile token is needed before calculate balance")
+            print("Compile token is needed before calculate")
             return 0
         # DEBUG
         # print("get_total_sales: "+str(self.get_total_sales()))
         # print("get_total_purchases_sold: "+str(self.get_total_purchases_sold()))
         return self.get_total_sales()-self.get_total_purchases_sold()
+
+    def get_null_sale_price(self):
+        '''
+        Returns the sale price for which the gains are zero (that is, there are no losses)
+        '''
+        if not(self.compiled):
+            print("Compile token is needed before calculate")
+            return 0
+            
+        return 0
+
+    def get_current_earns_status(self):
+        '''
+        Returns earnings if the amount of the token withheld is sold with the current market price
+        '''
+        if not(self.compiled):
+            print("Compile token is needed before calculate")
+            return 0
+            
+        return 0
+
+    def get_current_token_price(self):
+        '''
+        Returns the current price of the token
+        '''
+        if not(self.compiled):
+            print("Compile token is needed before calculate")
+            return 0
+            
+        return 0
         
     # Con el de hold:
         # Buscar precio actual y ver si estas en ganancia o perdida
