@@ -174,5 +174,6 @@ for t in token_list.values():
     print("\n\n*-*-*-*-*")
     print(str(t.name)+":")
     t.compile()
-    print("Held token quantity: "+str(t.get_final_qty()))
     print("Earns: "+str(t.get_earns()))
+    print("Held token quantity: "+str(t.get_final_qty()))
+    print("Null sale price: "+str(t.get_null_sale_price()))
