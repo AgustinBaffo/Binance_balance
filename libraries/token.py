@@ -4,9 +4,10 @@ class Token(object):
     def __init__(self, name) -> None:
         super().__init__()
 
-        self.name = name
-        self.compiled = False
+        self._currentPrice = -1          # Current token price
+        self._compiled = False           # Flag model is compiled
 
+        self.name = name
         # Array of nx2 [amount,price]
         self.purchases = np.empty((0,2), float)         # Total purchases
         self.sales = np.empty((0,2), float)             # Total sales
@@ -74,13 +75,13 @@ class Token(object):
         '''
         Does some calculations that are necessary before generating balance
         '''
-        if self.compiled:
+        if self._compiled:
             print("Token already compiled")
             return False
 
         self._split_purchases()
 
-        self.compiled = True
+        self._compiled = True
         return True
 
     def _split_purchases(self):
@@ -133,7 +134,7 @@ class Token(object):
         Returns the earnings of the part sold.
         It is calculated using purchases at the lowest possible price.
         '''
-        if not(self.compiled):
+        if not(self._compiled):
             print("Compile token is needed before calculate")
             return 0
         # DEBUG
@@ -146,7 +147,7 @@ class Token(object):
         Returns the sale price for which the gains are zero (that is, there are no losses)
         Is calculated as: amount_of_holded_tokens * null_sale_price = total_USD_held
         '''
-        if not(self.compiled):
+        if not(self._compiled):
             print("Compile token is needed before calculate")
             return 0
 
@@ -162,19 +163,27 @@ class Token(object):
     def get_current_earns_status(self):
         '''
         Returns earnings if the amount of the token withheld is sold with the current market price
+        Is calculated as: current_earns_status = total_USD_held - (amount_of_holded_tokens * current_token_price)
         '''
-        if not(self.compiled):
+        if not(self._compiled):
             print("Compile token is needed before calculate")
             return 0
-            
-        return 0
+        if self._currentPrice<0:
+            print("Invalid token current price: (%.f)" % self._currentPrice)
+            return 0
 
-    def get_current_token_price(self):
+        total_USD_held = (self.purchases_held[:,0]*self.purchases_held[:,1]).sum()
+        amount_of_holded_tokens = self.purchases_held[:,0].sum()
+
+        return total_USD_held - (amount_of_holded_tokens * self._currentPrice)
+
+    def set_current_token_price(self,price):
         '''
-        Returns the current price of the token
+        Set the current price of the token in the market 
         '''
-        if not(self.compiled):
-            print("Compile token is needed before calculate")
-            return 0
+
+        if price >= 0:
+            self._currentPrice = price
+            return True
             
-        return 0
+        return False

@@ -3,6 +3,7 @@ import numpy as np
 import pickle
 import re
 import hashlib
+from datetime import datetime
 
 from libraries.token import Token
 from libraries.global_functions import get_token_price_by_date
@@ -14,6 +15,7 @@ P2P_DATA_PATH = './data/p2p_report.pickle'
 P2P_HASH_PATH = './data/p2p_hash.pickle'
 
 use_previous_data_p2p_data = True
+update_token_price = True
 
 
 trading_fields = {
@@ -169,11 +171,21 @@ with open(REPORT_TRADING_PATH) as f:
 
                 token_list[token1_name].trade(side,token1_qty,price)
 
-        
+
+# Set current token values:
+if update_token_price:
+    for t in token_list.values():
+        print(t.name)
+        t.set_current_token_price(get_token_price_by_date(t.name,str(datetime.now())))
+        print(t._currentPrice)
+
 for t in token_list.values():
     print("\n\n*-*-*-*-*")
     print(str(t.name)+":")
     t.compile()
     print("Earns: "+str(t.get_earns()))
-    print("Held token quantity: "+str(t.get_final_qty()))
-    print("Null sale price: "+str(t.get_null_sale_price()))
+    held_qty = t.get_final_qty()
+    print("Held token quantity: "+str(held_qty))
+    if held_qty > 0:
+        print("Null sale price: "+str(t.get_null_sale_price()))
+        print("Current status: "+str(t.get_current_earns_status()))
