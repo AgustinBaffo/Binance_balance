@@ -95,8 +95,8 @@ if not(force_update) and os.path.exists(TOKENS_DATA_PATH) and os.path.exists(P2P
         with open(TOKENS_DATA_PATH, 'rb') as handle:
             token_list = pickle.load(handle)
 
-        need_read_p2p_file = False
-
+        need_update_data = False
+        
 if need_update_data:
 
     print("Reading P2P report")
@@ -170,9 +170,9 @@ if need_update_data:
                     token_list[token1_name].trade(side,token1_qty,price)
 
 
-    # Set current token values:
-    for t in token_list.values():
-        t.set_current_token_price(get_token_price_by_date(t.name,str(datetime.now())))
+        # Set current token values:
+        for t in token_list.values():
+            t.set_current_token_price(get_token_price_by_date(t.name,str(datetime.now())))
 
     # Save data into pickle
     with open(TOKENS_DATA_PATH, 'wb') as handle:
