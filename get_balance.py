@@ -10,12 +10,14 @@ from libraries.global_functions import get_token_price_by_date
 
 
 REPORT_TRADING_PATH = './reports/trading.csv'
+TRADING_HASH_PATH = './data/trading_hash.pickle'
+
 REPORT_P2P_PATH = './reports/p2p.csv'
-P2P_DATA_PATH = './data/p2p_report.pickle'
 P2P_HASH_PATH = './data/p2p_hash.pickle'
 
-use_previous_data_p2p_data = True
-update_token_price = True
+TOKENS_DATA_PATH = './data/tokens_data.pickle'
+
+force_update = False
 
 
 trading_fields = {
@@ -69,29 +71,33 @@ def get_hash_file(file_path):
 ####################################
 
 # If file was already read, the data was already downloaded and storaged and the file wasn't change => use previous data
-need_read_p2p_file = True
+need_update_data = True
 
 # Check if previous file information exist
-if use_previous_data_p2p_data and os.path.exists(P2P_DATA_PATH) and os.path.exists(P2P_HASH_PATH):
+if not(force_update) and os.path.exists(TOKENS_DATA_PATH) and os.path.exists(P2P_HASH_PATH) and os.path.exists(TRADING_HASH_PATH):
 
     # Load previous hash from pickle and get hash from new file
     with open(P2P_HASH_PATH, 'rb') as handle:
-        prev_hash_value = pickle.load(handle)
+        prev_hash_value_p2p = pickle.load(handle)
     
-    new_hash_value = get_hash_file(REPORT_P2P_PATH)
+    with open(TRADING_HASH_PATH, 'rb') as handle:
+        prev_hash_value_trading = pickle.load(handle)
+    
+    new_hash_value_trading = get_hash_file(REPORT_TRADING_PATH)
+    new_hash_value_p2p = get_hash_file(REPORT_P2P_PATH)
 
-    if new_hash_value == prev_hash_value: # File didn't change
+    if new_hash_value_p2p == prev_hash_value_p2p and new_hash_value_trading == prev_hash_value_trading: # Files didn't change
         
-        print("P2P report didn't change: using previous data")
+        print("Reports didn't change: using previous data")
 
         # Load p2p data from pickle
-        print("Load p2p datafrom "+str(P2P_DATA_PATH))
-        with open(P2P_DATA_PATH, 'rb') as handle:
+        print("Load data from file: "+str(TOKENS_DATA_PATH))
+        with open(TOKENS_DATA_PATH, 'rb') as handle:
             token_list = pickle.load(handle)
 
         need_read_p2p_file = False
 
-if need_read_p2p_file:
+if need_update_data:
 
     print("Reading P2P report")
 
@@ -121,63 +127,63 @@ if need_read_p2p_file:
 
                     token_list[token_name].trade(side,token_qty,token_price_usd)
 
+
+    ####################################
+    ## Read trading file.
+    ####################################
+
+    print("Reading trading report")
+    with open(REPORT_TRADING_PATH) as f:
+        next(f) # Ignore first line
+        for line in f:
+
+            line = line.rstrip("\n")                # remove end of line
+            line = regexRemoveComma.sub('', line)   # remove comma between quotes
+            line = line.replace('"', "")                   # remove quotes
+
+            values = line.split(",")
+            status = values[trading_fields["status"]]
+
+            if status=="FILLED":
+                side = values[trading_fields["side"]]
+                price = float(values[trading_fields["avgPrice"]])
+
+                # Split tokens and values (ex 309.6300000000USDT -> 309.63 + USDT)
+                token1_str = values[trading_fields["executed"]]
+                token1_name = regexName.sub('', token1_str)
+                token1_qty = float(regexValue.sub('', token1_str))
+
+                token2_str = values[trading_fields["tradingTotal"]]
+                token2_name = regexName.sub('', token2_str)
+                token2_qty = float(regexValue.sub('', token2_str))
+
+
+                if not(token2_name in STABLECOINS_NAMES):
+                    print(token2_name+" is not an stablecoin: only the balances for transactions with stablecoins are implemented")
+                    quit()
+                else:
+
+                    # Add new elent to token list
+                    if not(token1_name in token_list):
+                        token_list[token1_name] = Token(token1_name)
+
+                    token_list[token1_name].trade(side,token1_qty,price)
+
+
+    # Set current token values:
+    for t in token_list.values():
+        t.set_current_token_price(get_token_price_by_date(t.name,str(datetime.now())))
+
     # Save data into pickle
-    with open(P2P_DATA_PATH, 'wb') as handle:
+    with open(TOKENS_DATA_PATH, 'wb') as handle:
         pickle.dump(token_list, handle, protocol=pickle.HIGHEST_PROTOCOL)
     # Save hash into pickle
-    new_hash_value = get_hash_file(REPORT_P2P_PATH)
+    new_hash_value_p2p = get_hash_file(REPORT_P2P_PATH)
     with open(P2P_HASH_PATH, 'wb') as handle:
-        pickle.dump(new_hash_value, handle, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-####################################
-## Read trading file.
-####################################
-
-print("Reading trading report")
-with open(REPORT_TRADING_PATH) as f:
-    next(f) # Ignore first line
-    for line in f:
-
-        line = line.rstrip("\n")                # remove end of line
-        line = regexRemoveComma.sub('', line)   # remove comma between quotes
-        line = line.replace('"', "")                   # remove quotes
-
-        values = line.split(",")
-        status = values[trading_fields["status"]]
-
-        if status=="FILLED":
-            side = values[trading_fields["side"]]
-            price = float(values[trading_fields["avgPrice"]])
-
-            # Split tokens and values (ex 309.6300000000USDT -> 309.63 + USDT)
-            token1_str = values[trading_fields["executed"]]
-            token1_name = regexName.sub('', token1_str)
-            token1_qty = float(regexValue.sub('', token1_str))
-
-            token2_str = values[trading_fields["tradingTotal"]]
-            token2_name = regexName.sub('', token2_str)
-            token2_qty = float(regexValue.sub('', token2_str))
-
-
-            if not(token2_name in STABLECOINS_NAMES):
-                print(token2_name+" is not an stablecoin: only the balances for transactions with stablecoins are implemented")
-                quit()
-            else:
-
-                # Add new elent to token list
-                if not(token1_name in token_list):
-                    token_list[token1_name] = Token(token1_name)
-
-                token_list[token1_name].trade(side,token1_qty,price)
-
-
-# Set current token values:
-if update_token_price:
-    for t in token_list.values():
-        print(t.name)
-        t.set_current_token_price(get_token_price_by_date(t.name,str(datetime.now())))
-        print(t._currentPrice)
+        pickle.dump(new_hash_value_p2p, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    new_hash_value_trading = get_hash_file(REPORT_TRADING_PATH)
+    with open(TRADING_HASH_PATH, 'wb') as handle:
+        pickle.dump(new_hash_value_trading, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
 for t in token_list.values():
     print("\n\n*-*-*-*-*")
@@ -188,4 +194,7 @@ for t in token_list.values():
     print("Held token quantity: "+str(held_qty))
     if held_qty > 0:
         print("Null sale price: "+str(t.get_null_sale_price()))
-        print("Current status: "+str(t.get_current_earns_status()))
+        current_price = t.get_current_token_price()
+        print("Current price: "+str(current_price))
+        if current_price >= 0:
+            print("Current status: "+str(t.get_current_earns_status()))

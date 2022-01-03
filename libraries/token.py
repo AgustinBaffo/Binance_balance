@@ -187,3 +187,10 @@ class Token(object):
             return True
             
         return False
+
+    def get_current_token_price(self):
+        '''
+        Get the current price of the token in the market 
+        '''
+        
+        return self._currentPrice
